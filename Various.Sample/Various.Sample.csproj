@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DynamicData" Version="7.12.11" />
     <PackageReference Include="ReactiveUI" Version="18.4.1" />
     <PackageReference Include="ReactiveUI.Events.WPF" Version="15.1.1" />
     <PackageReference Include="ReactiveUI.Fody" Version="18.4.1" />
@@ -15,6 +16,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Various.Wpf\Various.Wpf.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Views\FlowItemView.xaml.cs" />
   </ItemGroup>
 
 </Project>

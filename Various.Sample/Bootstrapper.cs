@@ -34,6 +34,5 @@ internal class Bootstrapper
     {
         _mutableResolver.Register<IViewFor<MainViewModel>>(() => new MainView());
         _mutableResolver.Register<IViewFor<NotificationViewModel>>(() => new NotificationView());
-        _mutableResolver.Register<IViewFor<FlowItemViewModel>>(() => new FlowItemView());
     }
 }

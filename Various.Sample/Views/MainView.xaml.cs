@@ -18,6 +18,11 @@ public partial class MainView
                 viewModel => viewModel.CommandOpenDialog,
                 view => view.ButtonOpenDialog)
             .DisposeWith(disposable);
+            
+            this.BindCommand(ViewModel,
+                    viewModel => viewModel.CommandOpenAppBar,
+                    view => view.ButtonOpenAppBar)
+                .DisposeWith(disposable);
 
             this.BindCommand(ViewModel,
                 viewModel => viewModel.CommandUpdateSampleService,

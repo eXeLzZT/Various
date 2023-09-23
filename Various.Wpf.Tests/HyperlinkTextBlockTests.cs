@@ -1,7 +1,7 @@
 ﻿using NUnit.Framework;
 using System.Threading;
 using System.Windows.Documents;
-using Various.Wpf.Controls.TextBlocks;
+using Various.Wpf.Controls;
 
 namespace Various.Wpf.Tests;
 

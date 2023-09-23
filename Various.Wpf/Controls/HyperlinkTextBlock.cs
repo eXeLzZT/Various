@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using Various.Utils;
 
-namespace Various.Wpf.Controls.TextBlocks;
+namespace Various.Wpf.Controls;
 
 public class HyperlinkTextBlock : TextBlock
 {

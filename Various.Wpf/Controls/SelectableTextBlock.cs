@@ -1,5 +1,5 @@
 ﻿using System.Windows;
-using Various.Wpf.Controls.TextBlocks;
+using Various.Wpf.Helper;
 
 namespace Various.Wpf.Controls;
 

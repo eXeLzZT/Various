@@ -20,8 +20,11 @@
 
         <StackPanel Grid.Row="0">
             <Button x:Name="ButtonOpenDialog"
-                Height="50"
-                Width="50 "/>
+                    Content="Open modal dialog"
+                    Height="50" />
+            <Button x:Name="ButtonOpenAppBar"
+                    Content="Open app bar"
+                    Height="50" />
             <controls:SelectableTextBlock Text="This is a test: https://www.google.de" />
             <ComboBox x:Name="ComboBoxStructItems">
                 <ComboBox.ItemTemplate>

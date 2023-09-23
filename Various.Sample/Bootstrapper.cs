@@ -28,11 +28,13 @@ internal class Bootstrapper
     private void RegisterServices()
     {
         _mutableResolver.RegisterConstant<ISampleService>(new SampleService());
+        _mutableResolver.RegisterConstant<IDialogService>(new DialogService());
     }
 
     private void RegisterViews()
     {
         _mutableResolver.Register<IViewFor<MainViewModel>>(() => new MainView());
         _mutableResolver.Register<IViewFor<NotificationViewModel>>(() => new NotificationView());
+        _mutableResolver.Register<IViewFor<AppBarViewModel>>(() => new AppBarView());
     }
 }

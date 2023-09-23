@@ -9,6 +9,7 @@ using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using Various.Sample.Services.Interfaces;
+using Various.Utils;
 using Various.Wpf.Controls;
 
 namespace Various.Sample.ViewModels;
@@ -31,6 +32,7 @@ public class MainViewModel : ReactiveObject, IUseReactiveModal
 
     public ICommand CommandCloseDialog { get; }
     public ICommand CommandOpenDialog { get; }
+    public ICommand CommandOpenAppBar { get; }
     public ICommand CommandUpdateSampleService { get; }
 
     internal MainViewModel(ISampleService? sampleService = null, IDialogService? dialogService = null)
@@ -44,14 +46,14 @@ public class MainViewModel : ReactiveObject, IUseReactiveModal
         _defaultItems.AddRange(new List<SampleItem> { new SampleItem("", "All"), new SampleItem("OWN", "Own") });
 
         _sampleService?.Connect()
-                       .Merge(_defaultItems.Connect())
-                       .Transform(x => new Item(x.Id, x.Name))
-                       .Sort(SortExpressionComparer<Item>.Ascending(x => x.Name))
-                       .ObserveOn(RxApp.MainThreadScheduler)
-                       .Bind(out _structItems)
-                       .DisposeMany()
-                       .Subscribe();
-        
+            .Merge(_defaultItems.Connect())
+            .Transform(x => new Item(x.Id, x.Name))
+            .Sort(SortExpressionComparer<Item>.Ascending(x => x.Name))
+            .ObserveOn(RxApp.MainThreadScheduler)
+            .Bind(out _structItems)
+            .DisposeMany()
+            .Subscribe();
+
         FlowItemViewModels = new ObservableCollection<FlowItemViewModel>();
 
         for (var i = 0; i < 15; i++)
@@ -83,6 +85,7 @@ public class MainViewModel : ReactiveObject, IUseReactiveModal
 
         CommandCloseDialog = ReactiveCommand.Create(CloseDialog);
         CommandOpenDialog = ReactiveCommand.Create(OpenDialog);
+        CommandOpenAppBar = ReactiveCommand.Create(OpenAppBar);
         CommandUpdateSampleService = ReactiveCommand.Create(UpdateSampleService);
     }
 
@@ -94,6 +97,13 @@ public class MainViewModel : ReactiveObject, IUseReactiveModal
     private void OpenDialog()
     {
         IsModalOpen = true;
+    }
+
+    private void OpenAppBar()
+    {
+        _dialogService.Show<AppBarViewModel>(
+            window => AppBarUtils.Register(window),
+            (window, e) => AppBarUtils.Unregister(window));
     }
 
     private void UpdateSampleService()

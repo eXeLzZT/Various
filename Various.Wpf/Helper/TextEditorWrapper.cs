@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace Various.Wpf.Controls;
+namespace Various.Wpf.Helper;
 
 internal class TextEditorWrapper
 {

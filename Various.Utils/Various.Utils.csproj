@@ -5,6 +5,7 @@
     <UseWpf>true</UseWpf>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
 
 </Project>

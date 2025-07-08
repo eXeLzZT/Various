@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows;
@@ -10,6 +10,34 @@ namespace Various.Wpf.Controls;
 
 public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 {
+    #region DependencyProperty Orientation
+
+    public static readonly DependencyProperty OrientationProperty =
+        DependencyProperty.Register(
+            nameof(Orientation),
+            typeof(Orientation),
+            typeof(VirtualizingFlowPanel),
+            new FrameworkPropertyMetadata(
+                Orientation.Horizontal,
+                FrameworkPropertyMetadataOptions.AffectsMeasure,
+                OnOrientationChanged));
+
+    public Orientation Orientation
+    {
+        get => (Orientation)GetValue(OrientationProperty);
+        set => SetValue(OrientationProperty, value);
+    }
+
+    private static void OnOrientationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var flowPanel = (VirtualizingFlowPanel)d;
+        var orientation = (Orientation)e.NewValue;
+
+        flowPanel?.SetMouseWheelScrollDirection(orientation);
+    }
+
+    #endregion
+
     #region DependencyProperty ItemHeight
 
     public static readonly DependencyProperty ItemHeightProperty =
@@ -77,6 +105,8 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
     private ItemRange _itemRange;
     private int _itemsPerRowCount;
     private int _rowCount;
+
+    private ScrollDirection _mouseWheelScrollDirection = ScrollDirection.Horizontal;
 
     private new IRecyclingItemContainerGenerator ItemContainerGenerator
     {
@@ -203,7 +233,14 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
     public void MouseWheelDown()
     {
-        ScrollVertical(ScrollUnit is ScrollUnit.Pixel ? MouseWheelDelta : GetMouseWheelDownUpScrollAmount());
+        if (_mouseWheelScrollDirection is ScrollDirection.Vertical)
+        {
+            ScrollVertical(ScrollUnit is ScrollUnit.Pixel ? MouseWheelDelta : GetMouseWheelDownUpScrollAmount());
+        }
+        else
+        {
+            MouseWheelRight();
+        }
     }
 
     public void MouseWheelLeft()
@@ -218,7 +255,14 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
     public void MouseWheelUp()
     {
-        ScrollVertical(ScrollUnit is ScrollUnit.Pixel ? -MouseWheelDelta : -GetMouseWheelDownUpScrollAmount());
+        if (_mouseWheelScrollDirection is ScrollDirection.Vertical)
+        {
+            ScrollVertical(ScrollUnit is ScrollUnit.Pixel ? -MouseWheelDelta : -GetMouseWheelDownUpScrollAmount());
+        }
+        else
+        {
+            MouseWheelLeft();
+        }
     }
 
     public void PageDown()
@@ -250,7 +294,10 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
         UpdateComputedValues(availableSize);
 
-        var extent = new Size(_childSize.Width * _itemsPerRowCount, _childSize.Height * _rowCount);
+        var extent =
+            CreateOrientedSize(
+                GetOrientedWidth(_childSize) * _itemsPerRowCount, GetOrientedHeight(_childSize) * _rowCount);
+
         var desiredWidth = Math.Min(availableSize.Width, extent.Width);
         var desiredHeight = Math.Min(availableSize.Height, extent.Height);
         var desiredSize = new Size(desiredWidth, desiredHeight);
@@ -269,11 +316,11 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
         return desiredSize;
     }
-    
+
     protected override Size ArrangeOverride(Size finalSize)
     {
-        var offsetX = _offset.X;
-        var offsetY = _offset.Y;
+        var offsetX = GetOrientedX(_offset);
+        var offsetY = GetOrientedY(_offset);
 
         for (var childIndex = 0; childIndex < InternalChildren.Count; childIndex++)
         {
@@ -281,10 +328,10 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
             var itemIndex = GetItemIndexFromChildIndex(childIndex);
             var columnIndex = itemIndex % _itemsPerRowCount;
             var rowIndex = itemIndex / _itemsPerRowCount;
-            var x = columnIndex * _childSize.Width;
-            var y = rowIndex * _childSize.Height;
+            var x = columnIndex * GetOrientedWidth(_childSize);
+            var y = rowIndex * GetOrientedHeight(_childSize);
 
-            child.Arrange(new Rect(x - offsetX, y - offsetY, _childSize.Width, _childSize.Height));
+            child.Arrange(CreateOrientedRect(x - offsetX, y - offsetY, _childSize.Width, _childSize.Height));
         }
 
         return finalSize;
@@ -337,9 +384,10 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
     private bool MustIgnoreMeasure()
     {
         var scrollOwner = ScrollOwner;
-
         if (scrollOwner is null)
+        {
             return false;
+        }
 
         var verticalScrollBarGotHidden =
             scrollOwner.VerticalScrollBarVisibility is ScrollBarVisibility.Auto
@@ -353,13 +401,15 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
         _previousVerticalScrollBarVisibility = scrollOwner.ComputedVerticalScrollBarVisibility;
         _previousHorizontalScrollBarVisibility = scrollOwner.ComputedHorizontalScrollBarVisibility;
 
-        return !scrollOwner.IsMeasureValid && verticalScrollBarGotHidden || horizontalScrollBarGotHidden;
+        return !scrollOwner.IsMeasureValid ||
+               !scrollOwner.IsMeasureValid && verticalScrollBarGotHidden || horizontalScrollBarGotHidden;
     }
 
     private void UpdateComputedValues(Size availableSize)
     {
         var children = Items;
         var childCount = children.Count;
+        var columnCount = 1;
 
         if (childCount is 0)
             return;
@@ -379,7 +429,7 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
             var minColumns = (int)Math.Max(1, availableWidth / maxItemWidth);
             var maxRows = (int)Math.Max(1, availableHeight / ItemHeight);
 
-            var columnCount = maxColumns;
+            columnCount = maxColumns;
 
             for (var columnIndex = minColumns; columnIndex <= maxColumns; columnIndex++)
             {
@@ -400,8 +450,21 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
             _childSize = new Size(minItemWidth, ItemHeight);
         }
 
-        _itemsPerRowCount = Math.Max(1, (int)Math.Floor(availableWidth / _childSize.Width));
-        _rowCount = (int)Math.Ceiling((double)Items.Count / _itemsPerRowCount);
+        double itemsPerRowCount;
+
+        if (columnCount == 1)
+        {
+            itemsPerRowCount = columnCount;
+            _mouseWheelScrollDirection = ScrollDirection.Vertical;
+        }
+        else
+        {
+            itemsPerRowCount = Math.Max(1, GetOrientedWidth(availableSize) / GetOrientedWidth(_childSize));
+            SetMouseWheelScrollDirection(Orientation);
+        }
+
+        _itemsPerRowCount = (int)Math.Floor(itemsPerRowCount);
+        _rowCount = (int)Math.Ceiling((double)childCount / _itemsPerRowCount);
     }
 
     private void UpdateScrollInfo(Size desiredSize, Size extent)
@@ -440,13 +503,14 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
     private ItemRange UpdateItemRange()
     {
-        var viewportStartPosition = _offset.Y;
-        var viewportEndPosition = _offset.Y + _viewport.Height;
+        var viewportStartPosition = GetOrientedY(_offset);
+        var viewportEndPosition = GetOrientedY(_offset) + GetOrientedHeight(_viewport);
 
         if (CacheLengthUnit == VirtualizationCacheLengthUnit.Pixel)
         {
             viewportStartPosition = Math.Max(viewportStartPosition - CacheLength.CacheBeforeViewport, 0);
-            viewportEndPosition = Math.Min(viewportEndPosition + CacheLength.CacheAfterViewport, _extent.Height);
+            viewportEndPosition =
+                Math.Min(viewportEndPosition + CacheLength.CacheAfterViewport, GetOrientedHeight(_extent));
         }
 
         var startRowIndex = GetRowIndex(viewportStartPosition);
@@ -472,7 +536,7 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
     private int GetRowIndex(double location)
     {
-        var calculatedRowIndex = (int)Math.Floor(location / _childSize.Height);
+        var calculatedRowIndex = (int)Math.Floor(location / GetOrientedHeight(_childSize));
         var maxRowIndex = (int)Math.Ceiling(Items.Count / (double)_itemsPerRowCount);
 
         return Math.Max(Math.Min(calculatedRowIndex, maxRowIndex), 0);
@@ -534,5 +598,53 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
     {
         var generatorPosition = new GeneratorPosition(childIndex, 0);
         return ItemContainerGenerator.IndexFromGeneratorPosition(generatorPosition);
+    }
+
+    private double GetOrientedX(Point point)
+    {
+        return Orientation is Orientation.Vertical || _mouseWheelScrollDirection is ScrollDirection.Vertical
+            ? point.X
+            : point.Y;
+    }
+
+    private double GetOrientedY(Point point)
+    {
+        return Orientation is Orientation.Vertical || _mouseWheelScrollDirection is ScrollDirection.Vertical
+            ? point.Y
+            : point.X;
+    }
+
+    private double GetOrientedWidth(Size size)
+    {
+        return Orientation is Orientation.Vertical || _mouseWheelScrollDirection is ScrollDirection.Vertical
+            ? size.Width
+            : size.Height;
+    }
+
+    private double GetOrientedHeight(Size size)
+    {
+        return Orientation is Orientation.Vertical || _mouseWheelScrollDirection is ScrollDirection.Vertical
+            ? size.Height
+            : size.Width;
+    }
+
+    private Size CreateOrientedSize(double width, double height)
+    {
+        return Orientation is Orientation.Vertical || _mouseWheelScrollDirection is ScrollDirection.Vertical
+            ? new Size(width, height)
+            : new Size(height, width);
+    }
+
+    private Rect CreateOrientedRect(double x, double y, double width, double height)
+    {
+        return Orientation is Orientation.Vertical || _mouseWheelScrollDirection is ScrollDirection.Vertical
+            ? new Rect(x, y, width, height)
+            : new Rect(y, x, width, height);
+    }
+
+    private void SetMouseWheelScrollDirection(Orientation orientation)
+    {
+        _mouseWheelScrollDirection =
+            orientation is Orientation.Vertical ? ScrollDirection.Vertical : ScrollDirection.Horizontal;
     }
 }

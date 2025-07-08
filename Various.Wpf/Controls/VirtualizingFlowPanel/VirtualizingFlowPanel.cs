@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -98,13 +99,15 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
     private Size _viewport;
     private Point _offset;
 
-    private IRecyclingItemContainerGenerator? _itemContainerGenerator;
+    private DependencyObject? _itemsOwner;
+    private ItemContainerGenerator? _itemContainerGenerator;
     private Visibility _previousVerticalScrollBarVisibility;
     private Visibility _previousHorizontalScrollBarVisibility;
     private Size _childSize;
     private ItemRange _itemRange;
     private int _itemsPerRowCount;
     private int _rowCount;
+    private bool _itemsChanged;
 
     private ScrollDirection _mouseWheelScrollDirection = ScrollDirection.Horizontal;
 
@@ -115,19 +118,42 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
             if (_itemContainerGenerator is null)
             {
                 _ = InternalChildren;
-                _itemContainerGenerator = (IRecyclingItemContainerGenerator)base.ItemContainerGenerator;
+                
+                _itemContainerGenerator = base.ItemContainerGenerator.GetItemContainerGeneratorForPanel(this);
+                _itemContainerGenerator.ItemsChanged += OnItemContainerGeneratorItemsChanged;
             }
-
             return _itemContainerGenerator;
         }
     }
 
-    private ItemsControl ItemsOwner => ItemsControl.GetItemsOwner(this);
+    private DependencyObject ItemsOwner
+    {
+        get
+        {
+            if (_itemsOwner is null)
+            {
+                /* Use reflection to access internal method because the public
+                 * GetItemsOwner method does always return the items control instead
+                 * of the real items owner for example the group item when grouping */
+                var getItemsOwnerInternalMethod = typeof(ItemsControl).GetMethod(
+                    "GetItemsOwnerInternal",
+                    BindingFlags.Static | BindingFlags.NonPublic,
+                    null,
+                    [typeof(DependencyObject)],
+                    null
+                )!;
+                _itemsOwner = (DependencyObject)getItemsOwnerInternalMethod.Invoke(null, [this])!;
+            }
+            return _itemsOwner;
+        }
+    }
+
+    private ItemsControl ItemsControl => ItemsControl.GetItemsOwner(this);
     private ReadOnlyCollection<object> Items => ((ItemContainerGenerator)ItemContainerGenerator).Items;
-    private VirtualizationMode VirtualizationMode => GetVirtualizationMode(ItemsOwner);
-    private VirtualizationCacheLength CacheLength => GetCacheLength(ItemsOwner);
-    private VirtualizationCacheLengthUnit CacheLengthUnit => GetCacheLengthUnit(ItemsOwner);
-    private ScrollUnit ScrollUnit => GetScrollUnit(ItemsOwner);
+    private VirtualizationMode VirtualizationMode => GetVirtualizationMode(ItemsControl);
+    private VirtualizationCacheLength CacheLength => GetCacheLength(ItemsControl);
+    private VirtualizationCacheLengthUnit CacheLengthUnit => GetCacheLengthUnit(ItemsControl);
+    private ScrollUnit ScrollUnit => GetScrollUnit(ItemsControl);
 
     public ScrollViewer? ScrollOwner { get; set; }
     public bool CanHorizontallyScroll { get; set; }
@@ -139,6 +165,8 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
     public double ViewportWidth => _viewport.Width;
     public double HorizontalOffset => _offset.X;
     public double VerticalOffset => _offset.Y;
+
+    protected override bool CanHierarchicallyScrollAndVirtualizeCore => true;
 
     public Rect MakeVisible(Visual visual, Rect rectangle)
     {
@@ -383,6 +411,12 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
     private bool MustIgnoreMeasure()
     {
+        if (_itemsChanged)
+        {
+            _itemsChanged = false;
+            return false;
+        }
+        
         var scrollOwner = ScrollOwner;
         if (scrollOwner is null)
         {
@@ -646,5 +680,10 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
     {
         _mouseWheelScrollDirection =
             orientation is Orientation.Vertical ? ScrollDirection.Vertical : ScrollDirection.Horizontal;
+    }
+
+    private void OnItemContainerGeneratorItemsChanged(object sender, ItemsChangedEventArgs e)
+    {
+        _itemsChanged = true;
     }
 }

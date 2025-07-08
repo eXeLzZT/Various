@@ -118,10 +118,11 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
             if (_itemContainerGenerator is null)
             {
                 _ = InternalChildren;
-                
+
                 _itemContainerGenerator = base.ItemContainerGenerator.GetItemContainerGeneratorForPanel(this);
                 _itemContainerGenerator.ItemsChanged += OnItemContainerGeneratorItemsChanged;
             }
+
             return _itemContainerGenerator;
         }
     }
@@ -144,6 +145,7 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
                 )!;
                 _itemsOwner = (DependencyObject)getItemsOwnerInternalMethod.Invoke(null, [this])!;
             }
+
             return _itemsOwner;
         }
     }
@@ -461,8 +463,17 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
         {
             var maxColumns = (int)Math.Max(1, availableWidth / minItemWidth);
             var minColumns = (int)Math.Max(1, availableWidth / maxItemWidth);
-            var maxRows = (int)Math.Max(1, availableHeight / ItemHeight);
+            int maxRows;
 
+            if (ItemsOwner is IHierarchicalVirtualizationAndScrollInfo)
+            {
+                maxRows = (int)Math.Ceiling((double)childCount / maxColumns);
+            }
+            else
+            {
+                maxRows = (int)Math.Max(1, availableHeight / ItemHeight);
+            }
+            
             columnCount = maxColumns;
 
             for (var columnIndex = minColumns; columnIndex <= maxColumns; columnIndex++)
@@ -486,7 +497,7 @@ public class VirtualizingFlowPanel : VirtualizingPanel, IScrollInfo
 
         double itemsPerRowCount;
 
-        if (columnCount == 1)
+        if (ItemsOwner is IHierarchicalVirtualizationAndScrollInfo || columnCount == 1)
         {
             itemsPerRowCount = columnCount;
             _mouseWheelScrollDirection = ScrollDirection.Vertical;

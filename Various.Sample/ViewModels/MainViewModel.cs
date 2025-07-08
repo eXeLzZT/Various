@@ -58,10 +58,17 @@ public class MainViewModel : ReactiveObject, IUseReactiveModal
 
         for (var i = 0; i < 15; i++)
         {
+            var rdm = new Random().Next(1, 3);
             FlowItemViewModels.Add(new FlowItemViewModel
             {
                 Name = $"Test Card ({i})",
-                Info = $"Test info ({i})"
+                Info = $"Test info ({i})",
+                Group = rdm switch
+                {
+                    1 => "Grp1",
+                    2 => "Grp2",
+                    _ => "Grp3"
+                },
             });
         }
 

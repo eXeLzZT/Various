@@ -53,6 +53,10 @@ public partial class MainView
                 viewModel => viewModel.IsModalOpen,
                 view => view.ReactiveModal.IsOpen)
             .DisposeWith(disposable);
+
+            this.WhenAnyValue(x => x.ViewModel)
+                .BindTo(this, x => x.DataContext)
+                .DisposeWith(disposable);
         });
     }
 }

@@ -6,4 +6,5 @@ public class FlowItemViewModel : ReactiveObject
 {
     public string Name { get; set; }
     public string Info { get; set; }
+    public string Group { get; set; }
 }
